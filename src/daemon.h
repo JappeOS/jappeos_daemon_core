@@ -106,6 +106,20 @@ namespace JappeStudios::JappeOS::DaemonCore
             return s_instance->_conn != nullptr;
         }
 
+        [[nodiscard]] static DBus::InterfaceName GetBaseInterface()
+        {
+            if (!s_instance->_baseInterfacePath.has_value())
+                throw std::logic_error("GetBaseInterface called but DBus was not initialized");
+            return s_instance->_baseInterfacePath.value();
+        }
+
+        [[nodiscard]] static DBus::ObjectPath GetBaseObject()
+        {
+            if (!s_instance->_baseObjectPath.has_value())
+                throw std::logic_error("GetBaseObject called but DBus was not initialized");
+            return s_instance->_baseObjectPath.value();
+        }
+
     private:
         bool             _shouldRun = true;
         uint8_t          _exitCode = EXIT_SUCCESS;
@@ -119,6 +133,8 @@ namespace JappeStudios::JappeOS::DaemonCore
         DaemonClass*           _daemonInstance = nullptr;
         Logging::DaemonLogger* _logger = nullptr;
         DBus::Connection*      _conn = nullptr;
+        std::optional<DBus::InterfaceName> _baseInterfacePath;
+        std::optional<DBus::ObjectPath>    _baseObjectPath;
 
         void Initialize();
         void InitDBus(int& dbusFd);

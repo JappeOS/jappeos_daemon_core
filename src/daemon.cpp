@@ -205,6 +205,12 @@ namespace JappeStudios::JappeOS::DaemonCore
         _conn->AcquireName(config.name, config.flags);
         NULL_SAFE_CALL(_logger, Debug(std::string("D-Bus name acquired: ") + config.name));
         dbusFd = _conn->GetUnixFd();
+
+        _baseInterfacePath.emplace(config.name);
+
+        std::string objPath = config.name;
+        std::replace( objPath.begin(), objPath.end(), '.', '/');
+        _baseObjectPath.emplace(objPath);
     }
 
     void Daemon::Cleanup()
