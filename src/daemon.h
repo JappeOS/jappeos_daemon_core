@@ -27,7 +27,7 @@ namespace JappeStudios::JappeOS::DaemonCore
     int main(int argc, char* argv[]) \
     { \
         std::vector<std::string> arguments(argv + 1, argv + argc); \
-        Daemon daemon(arguments, (factory), (dbusConfig)); \
+        JappeStudios::JappeOS::DaemonCore::Daemon daemon(arguments, (factory), (dbusConfig)); \
         daemon.Run(); \
     }
 
