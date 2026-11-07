@@ -1,0 +1,25 @@
+/*
+ * jappeos_core, Core system management daemon for JappeOS.
+ * Copyright (C) 2026  The JappeOS team.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+#pragma once
+
+// Null safety
+#define NULL_SAFE_CALL_RET(ptr, call) ((ptr) ? (ptr)->call : nullptr)
+#define NULL_SAFE_CALL(ptr, call)     do { if ((ptr)) { (ptr)->call; } } while (0)
+#define NULL_CHECK(ptr)               do { if ((ptr) == nullptr) { throw NullCheckException(); } } while (0)
+#define NULL_CHECK_VAR(ptr, varname)  do { if ((ptr) == nullptr) { throw NullCheckException((varname)); } } while (0)
