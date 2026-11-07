@@ -23,6 +23,9 @@
 
 namespace JappeStudios::JappeOS::DaemonCore::System
 {
+#define JOS_LIVE_USER_NAME "liveuser"
+#define JOS_LIVE_USER_REAL_NAME "Live User"
+
 #define STORAGE_SYSTEM_FILE_INIT_BOOT_PATH "/jappeos/init_boot.env"
 #define STORAGE_SYSTEM_FILE_LIVE_PACKAGES_PATH "/jappeos/packages_live"
 
