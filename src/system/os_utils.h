@@ -20,10 +20,12 @@
 
 #include <filesystem>
 #include <fstream>
-#include <stdexcept>
 
-namespace JappeStudios::JappeOS::DaemonCore::Utils
+namespace JappeStudios::JappeOS::DaemonCore::System
 {
+#define STORAGE_SYSTEM_FILE_INIT_BOOT_PATH "/jappeos/init_boot.env"
+#define STORAGE_SYSTEM_FILE_LIVE_PACKAGES_PATH "/jappeos/packages_live"
+
     class OsUtils final
     {
     public:

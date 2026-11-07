@@ -20,7 +20,6 @@ set(JAPPEOS_DAEMON_SOURCES
         src/utils/scope_guard.h
         src/utils/command_runner.cpp
         src/utils/command_runner.h
-        src/utils/os_utils.h
         src/globals.h
         src/utils/stack_trace.h
         src/utils/null_check_exception.h
@@ -31,6 +30,8 @@ set(JAPPEOS_DAEMON_SOURCES
         src/logging/stdout_logger.h
         src/logging/logger.h
         src/logging/logger.cpp
+        src/system/os_utils.h
+        src/system/init_boot_file.h
 )
 
 function(jappeos_configure_target target_name)
