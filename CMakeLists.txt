@@ -77,4 +77,7 @@ endfunction()
 add_library(jappeos_daemon_core STATIC
         ${JAPPEOS_DAEMON_SOURCES}
 )
+add_library(jappeos_daemon_core::jappeos_daemon_core
+        ALIAS jappeos_daemon_core
+)
 jappeos_configure_target(jappeos_daemon_core)
