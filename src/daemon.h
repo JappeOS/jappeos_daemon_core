@@ -7,8 +7,7 @@
 #include <string>
 #include <system_error>
 #include <utility>
-#include <glib/gmain.h>
-#include <glib/gtypes.h>
+#include <glib.h>
 #include <sys/poll.h>
 
 #include "globals.h"
