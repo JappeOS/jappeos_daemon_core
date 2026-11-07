@@ -49,7 +49,7 @@ FetchContent_MakeAvailable(jappeos_daemon_core)
 
 Replace `<latest tag>` with the latest version of this library.
 
-### Notes
+## Notes
 
 - This project is **Linux-only** and relies on Linux-specific APIs and system services.
 
