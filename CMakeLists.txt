@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 4.4)
+cmake_minimum_required(VERSION 3.31)
 project(jappeos_daemon_core)
 
 set(CMAKE_CXX_STANDARD 20)
