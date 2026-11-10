@@ -138,6 +138,7 @@ namespace JappeStudios::JappeOS::DaemonCore
 
         void Initialize();
         void InitDBus(int& dbusFd);
+        void AcquireDBusName() const;
         void Cleanup();
 
         void Update();

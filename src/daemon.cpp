@@ -193,6 +193,7 @@ namespace JappeStudios::JappeOS::DaemonCore
 
         _daemonInstance = _factory();
 
+        AcquireDBusName();
         NULL_SAFE_CALL(_logger, Debug("Initialization finished!"));
     }
 
@@ -204,8 +205,7 @@ namespace JappeStudios::JappeOS::DaemonCore
 
         const auto& config = _dbusConfig.value();
         _conn = config.connectionFactory();
-        _conn->AcquireName(config.name, config.flags);
-        NULL_SAFE_CALL(_logger, Debug(std::string("D-Bus name acquired: ") + config.name));
+
         dbusFd = _conn->GetUnixFd();
 
         _baseInterfacePath.emplace(config.name);
@@ -213,6 +213,16 @@ namespace JappeStudios::JappeOS::DaemonCore
         std::string objPath = "/" + config.name;
         std::ranges::replace(objPath, '.', '/');
         _baseObjectPath.emplace(objPath);
+    }
+
+    void Daemon::AcquireDBusName() const
+    {
+        if (!_dbusConfig.has_value())
+            return;
+
+        const auto& config = _dbusConfig.value();
+        _conn->AcquireName(config.name, config.flags);
+        NULL_SAFE_CALL(_logger, Debug(std::string("D-Bus name acquired: ") + config.name));
     }
 
     void Daemon::Cleanup()

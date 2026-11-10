@@ -1,3 +1,3 @@
-pkgver=1.1.3
+pkgver=1.1.4
 _tag=main-v1.1.3-1
 pkgrel=1
