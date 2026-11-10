@@ -210,7 +210,7 @@ namespace JappeStudios::JappeOS::DaemonCore
 
         _baseInterfacePath.emplace(config.name);
 
-        std::string objPath = config.name;
+        std::string objPath = "/" + config.name;
         std::ranges::replace(objPath, '.', '/');
         _baseObjectPath.emplace(objPath);
     }

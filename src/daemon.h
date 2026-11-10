@@ -59,7 +59,7 @@ namespace JappeStudios::JappeOS::DaemonCore
     struct DaemonDBusConfig
     {
         std::function<DBus::Connection*()> connectionFactory;
-        const std::string& name;
+        std::string name; // Own the name: configuration outlives its initializer.
         unsigned int flags = DBUS_NAME_FLAG_DO_NOT_QUEUE;
     };
 
