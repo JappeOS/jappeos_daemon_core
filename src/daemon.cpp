@@ -19,6 +19,8 @@
 #include "daemon.h"
 
 #include <utility>
+#include <ranges>
+#include <algorithm>
 
 namespace JappeStudios::JappeOS::DaemonCore
 {
@@ -209,7 +211,7 @@ namespace JappeStudios::JappeOS::DaemonCore
         _baseInterfacePath.emplace(config.name);
 
         std::string objPath = config.name;
-        std::replace( objPath.begin(), objPath.end(), '.', '/');
+        std::ranges::replace(objPath, '.', '/');
         _baseObjectPath.emplace(objPath);
     }
 
