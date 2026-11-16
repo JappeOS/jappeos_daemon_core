@@ -21,7 +21,7 @@
 #include <unordered_map>
 #include <cstddef>
 
-namespace JappeStudios::JappeOS::JappeOSCore
+namespace JappeStudios::JappeOS::DaemonCore::Utils
 {
     template <typename... Args>
     class Event
