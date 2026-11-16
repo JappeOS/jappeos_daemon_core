@@ -32,6 +32,7 @@ set(JAPPEOS_DAEMON_SOURCES
         src/logging/logger.cpp
         src/system/os_utils.h
         src/system/init_boot_file.h
+        src/utils/event.h
 )
 
 function(jappeos_configure_target target_name)
