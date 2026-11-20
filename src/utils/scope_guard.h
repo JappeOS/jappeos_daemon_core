@@ -28,7 +28,7 @@ namespace JappeStudios::JappeOS::DaemonCore::Utils
         std::function<void()> _fn;
     public:
         explicit ScopeGuard(const std::function<void()> &f) : _fn(f) {}
-        ~ScopeGuard() { if (!_dismiss) _fn(); }
+        ~ScopeGuard() noexcept { if (!_dismiss) _fn(); }
         void Dismiss() { _dismiss = true; }
     };
 }
