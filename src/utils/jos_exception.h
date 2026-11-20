@@ -25,7 +25,7 @@
 
 namespace JappeStudios::JappeOS::DaemonCore::Utils
 {
-    class JosException : std::runtime_error
+    class JosException : public std::runtime_error
     {
     public:
         explicit JosException(const std::string& shortErrorCode, const std::string& msg) : std::runtime_error(msg)
