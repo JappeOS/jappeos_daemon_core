@@ -64,10 +64,7 @@ using namespace JappeStudios::JappeOS::DaemonCore;
 
 CREATE_DAEMON(
     [] { return new JappeStudios::JappeOS::MyServiced::MyService(); },
-    DaemonDBusConfig(
-        ([] { return new DBus::Connection(DBUS_BUS_SYSTEM); }),
-        "org.jappeos.MyServiced1"
-    )
+    DaemonDBusConfig::System("org.jappeos.MyServiced1")
 );
 ```
 DBus is commonly used for IPC (Inter Process Communication) in JappeOS, and many other Linux-based operating systems.

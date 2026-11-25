@@ -182,14 +182,17 @@ namespace JappeStudios::JappeOS::DaemonCore
         sigaction(SIGINT, &sa, nullptr);
         sigaction(SIGTERM, &sa, nullptr);
 
-        int dbusFd = -1;
-        InitDBus(dbusFd);
+        int dbusSystemFd = -1, dbusSessionFd = -1;
+        InitDBus(dbusSystemFd, dbusSessionFd);
 
-        _fds[0].fd = dbusFd;
+        _fds[0].fd = dbusSystemFd;
         _fds[0].events = POLLIN;
 
-        _fds[1].fd = s_pipeFds[0];
+        _fds[1].fd = dbusSessionFd;
         _fds[1].events = POLLIN;
+
+        _fds[2].fd = s_pipeFds[0];
+        _fds[2].events = POLLIN;
 
         _daemonInstance = _factory();
 
@@ -197,16 +200,37 @@ namespace JappeStudios::JappeOS::DaemonCore
         NULL_SAFE_CALL(_logger, Debug("Initialization finished!"));
     }
 
-    void Daemon::InitDBus(int& dbusFd)
+    void Daemon::InitDBus(int& dbusSystemFd, int& dbusSessionFd)
     {
-        dbusFd = -1;
+        dbusSystemFd = -1;
+        dbusSessionFd = -1;
         if (!_dbusConfig.has_value())
             return;
 
         const auto& config = _dbusConfig.value();
-        _conn = config.connectionFactory();
 
-        dbusFd = _conn->GetUnixFd();
+        _systemConn = std::move(config.systemConnectionFactory());
+        if (_systemConn != nullptr)
+            dbusSystemFd = _systemConn->GetUnixFd();
+
+        _sessionConn = std::move(config.sessionConnectionFactory());
+        if (_sessionConn != nullptr)
+            dbusSessionFd = _sessionConn->GetUnixFd();
+
+        if (_dbusConfig->busType == DBUS_BUS_SYSTEM)
+        {
+            NULL_CHECK_VAR(_systemConn, "_systemConn");
+            _conn = _systemConn.get();
+        }
+        else if (_dbusConfig->busType == DBUS_BUS_SESSION)
+        {
+            NULL_CHECK_VAR(_sessionConn, "_sessionConn");
+            _conn = _sessionConn.get();
+        }
+        else
+        {
+            throw JosException("DBUS_BUS_TYPE_UNHANDLED", "Unknown bus type");
+        }
 
         _baseInterfacePath.emplace(config.name);
 
@@ -231,8 +255,10 @@ namespace JappeStudios::JappeOS::DaemonCore
 
         delete _daemonInstance;
         _daemonInstance = nullptr;
-        delete _conn;
+        // _conn is just a reference, no need to delete
         _conn = nullptr;
+        _systemConn.reset(nullptr);
+        _sessionConn.reset(nullptr);
 
         NULL_SAFE_CALL(_logger, Debug("Cleanup done!"));
         delete _logger;
@@ -283,9 +309,10 @@ namespace JappeStudios::JappeOS::DaemonCore
         }
 
         std::vector<pollfd> pollFds;
-        pollFds.reserve(2 + static_cast<size_t>(std::max(0, glibN)));
+        pollFds.reserve(3 + static_cast<size_t>(std::max(0, glibN)));
         pollFds.push_back(_fds[0]);
         pollFds.push_back(_fds[1]);
+        pollFds.push_back(_fds[2]);
 
         for (gint i = 0; i < glibN; ++i)
         {
@@ -304,12 +331,13 @@ namespace JappeStudios::JappeOS::DaemonCore
 
         _fds[0].revents = pollFds[0].revents;
         _fds[1].revents = pollFds[1].revents;
+        _fds[2].revents = pollFds[2].revents;
 
         // GLib support
         if (glibAcquired)
         {
             for (gint i = 0; i < glibN; ++i)
-                glibFds[i].revents = static_cast<gushort>(pollFds[2 + i].revents);
+                glibFds[i].revents = static_cast<gushort>(pollFds[3 + i].revents);
 
             if (g_main_context_check(mainContext, glibMaxPriority, glibFds.data(), glibN))
                 g_main_context_dispatch(mainContext);
@@ -318,7 +346,7 @@ namespace JappeStudios::JappeOS::DaemonCore
         }
 
         // Signals
-        if (_fds[1].revents & POLLIN)
+        if (_fds[2].revents & POLLIN)
         {
             char buf[64];
             read(s_pipeFds[0], buf, sizeof(buf));
@@ -334,13 +362,23 @@ namespace JappeStudios::JappeOS::DaemonCore
 
     void Daemon::UpdateDBus() const
     {
-        if (_fds[0].revents & POLLIN)
+        if (_systemConn != nullptr && _fds[0].revents & POLLIN)
         {
-            while (_conn->ReadWrite(0))
+            while (_systemConn->ReadWrite(0))
             {
-                auto msg = _conn->PopMessage();
+                auto msg = _systemConn->PopMessage();
                 if (!msg.has_value()) break;
-                _conn->HandleMessage(msg.value());
+                _systemConn->HandleMessage(msg.value());
+            }
+        }
+
+        if (_sessionConn != nullptr && _fds[1].revents & POLLIN)
+        {
+            while (_sessionConn->ReadWrite(0))
+            {
+                auto msg = _sessionConn->PopMessage();
+                if (!msg.has_value()) break;
+                _sessionConn->HandleMessage(msg.value());
             }
         }
     }

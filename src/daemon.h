@@ -58,9 +58,34 @@ namespace JappeStudios::JappeOS::DaemonCore
 
     struct DaemonDBusConfig
     {
-        std::function<DBus::Connection*()> connectionFactory;
-        std::string name; // Own the name: configuration outlives its initializer.
-        unsigned int flags = DBUS_NAME_FLAG_DO_NOT_QUEUE;
+    public:
+        static DaemonDBusConfig System(std::string name, const unsigned int flags = DBUS_NAME_FLAG_DO_NOT_QUEUE)
+        {
+            return DaemonDBusConfig{
+                .name = std::move(name),
+                .flags = flags,
+                .busType = DBUS_BUS_SYSTEM,
+                .systemConnectionFactory = [] { return std::make_unique<DBus::Connection>(DBUS_BUS_SYSTEM); },
+                .sessionConnectionFactory = [] { return nullptr; },
+            };
+        }
+
+        static DaemonDBusConfig Session(std::string name, const unsigned int flags = DBUS_NAME_FLAG_DO_NOT_QUEUE)
+        {
+            return DaemonDBusConfig{
+                .name = std::move(name),
+                .flags = flags,
+                .busType = DBUS_BUS_SESSION,
+                .systemConnectionFactory = [] { return std::make_unique<DBus::Connection>(DBUS_BUS_SYSTEM); },
+                .sessionConnectionFactory = [] { return std::make_unique<DBus::Connection>(DBUS_BUS_SESSION); },
+            };
+        }
+
+        const std::string name; // Own the name: configuration outlives its initializer.
+        const unsigned int flags = DBUS_NAME_FLAG_DO_NOT_QUEUE;
+        const DBusBusType busType;
+        const std::function<std::unique_ptr<DBus::Connection>()> systemConnectionFactory;
+        const std::function<std::unique_ptr<DBus::Connection>()> sessionConnectionFactory;
     };
 
     class DaemonClass {};
@@ -106,6 +131,29 @@ namespace JappeStudios::JappeOS::DaemonCore
             return s_instance->_conn != nullptr;
         }
 
+        /**
+         * @brief Allows you to get the connection of a specific bus.
+         * Use [GetConnection] to get the connection of the service. This method should only need to be used when
+         * a session service needs to send a message to the system bus.
+         * @param busType Whether to get the system or session bus connection
+         * @return The connection for the specified bus
+         */
+        [[nodiscard]] static DBus::Connection& TryGetConnectionOnBus(const DBusBusType busType)
+        {
+            NULL_CHECK_VAR(s_instance, "s_instance");
+
+            DBus::Connection* conn;
+            if (busType == DBUS_BUS_SYSTEM)
+                conn = s_instance->_systemConn.get();
+            else if (busType == DBUS_BUS_SESSION)
+                conn = s_instance->_sessionConn.get();
+            else
+                throw JosException("DBUS_BUS_TYPE_UNHANDLED", "Unknown bus type");
+
+            NULL_CHECK_VAR(conn, "conn");
+            return *conn;
+        }
+
         [[nodiscard]] static DBus::InterfaceName GetBaseInterface()
         {
             if (!s_instance->_baseInterfacePath.has_value())
@@ -124,7 +172,7 @@ namespace JappeStudios::JappeOS::DaemonCore
         bool             _shouldRun = true;
         uint8_t          _exitCode = EXIT_SUCCESS;
         DaemonState      _state = DaemonState::Initializing;
-        pollfd           _fds[2]{};
+        pollfd           _fds[3]{};
 
         std::vector<std::string>        _startupArgs;
         std::function<DaemonClass*()>   _factory;
@@ -133,11 +181,13 @@ namespace JappeStudios::JappeOS::DaemonCore
         DaemonClass*           _daemonInstance = nullptr;
         Logging::DaemonLogger* _logger = nullptr;
         DBus::Connection*      _conn = nullptr;
+        std::unique_ptr<DBus::Connection> _systemConn = nullptr;
+        std::unique_ptr<DBus::Connection> _sessionConn = nullptr;
         std::optional<DBus::InterfaceName> _baseInterfacePath;
         std::optional<DBus::ObjectPath>    _baseObjectPath;
 
         void Initialize();
-        void InitDBus(int& dbusFd);
+        void InitDBus(int& dbusSystemFd, int& dbusSessionFd);
         void AcquireDBusName() const;
         void Cleanup();
 
