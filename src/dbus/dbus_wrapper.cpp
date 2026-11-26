@@ -575,19 +575,84 @@ namespace JappeStudios::JappeOS::DaemonCore::DBus
                                            _key(std::move(key))
     {
         _match = std::format(
-            "type='signal',sender='{}',{}interface='{}',member='{}'",
-            busName,
+            "type='signal',{}{}interface='{}',member='{}'",
+            busName.empty() ? "" : std::format("sender='{}',", busName),
             _key.path.has_value() ? std::format("path='{}',", _key.path.value().ToString()) : "",
             _key.interface.ToString(),
             _key.member
         );
 
-        auto& list = _conn._signalHandlers[_key];
-        _index = list.size();
-        list.push_back(std::make_shared<SignalHandler>(std::move(handler)));
+        // Bus match rules follow well-known names, but messages carry unique
+        // senders. Filter locally too: another subscription may admit the same
+        // signal from a different service into this connection's queue.
+        if (!_conn._peer && !busName.empty())
+        {
+            if (!dbus_validate_bus_name(busName.c_str(), nullptr))
+                throw DBusException(DBUS_ERROR_INVALID_ARGS, "Invalid signal bus name");
 
-        if (list.size() == 1)
-            AddMatchRule();
+            auto owner = std::make_shared<std::string>(busName);
+            if (busName.front() != ':' && busName != DBUS_SERVICE_DBUS)
+            {
+                // Install the watch before querying so changes during setup
+                // are queued and applied in bus order by normal dispatch.
+                _ownerSubscription = std::make_unique<SignalSubscription>(
+                    _conn.SubscribeSignal(
+                        DBUS_SERVICE_DBUS,
+                        ObjectPath(DBUS_PATH_DBUS),
+                        InterfaceName(DBUS_INTERFACE_DBUS),
+                        "NameOwnerChanged",
+                        [owner, busName](const Message& msg)
+                        {
+                            const auto [name, oldOwner, newOwner] =
+                                msg.GetArgs<std::string, std::string, std::string>();
+                            if (name == busName)
+                                *owner = newOwner;
+                        }
+                    )
+                );
+
+                auto query = Message::CreateMethodCall(
+                    DBUS_SERVICE_DBUS,
+                    ObjectPath(DBUS_PATH_DBUS),
+                    InterfaceName(DBUS_INTERFACE_DBUS),
+                    "GetNameOwner"
+                );
+                query.SetArgs(busName);
+
+                try
+                {
+                    *owner = std::get<0>(query.SendWithReply(_conn).GetArgs<std::string>());
+                }
+                catch (const DBusException& error)
+                {
+                    if (error.GetCode() != DBUS_ERROR_NAME_HAS_NO_OWNER)
+                        throw;
+                    owner->clear();
+                }
+            }
+
+            handler = [owner, callback = std::move(handler)](const Message& msg)
+            {
+                if (!owner->empty() && msg.GetSender() == *owner)
+                    callback(msg);
+            };
+        }
+
+        auto callback = std::make_shared<SignalHandler>(std::move(handler));
+        // Each subscription owns one reference to its exact bus match rule.
+        // The bus reference-counts identical rules.
+        AddMatchRule();
+        try
+        {
+            auto& list = _conn._signalHandlers[_key];
+            _index = list.size();
+            list.push_back(std::move(callback));
+        }
+        catch (...)
+        {
+            try { RemoveMatchRule(); } catch (const DBusException&) {}
+            throw;
+        }
     }
 
     SignalSubscription::~SignalSubscription()
@@ -595,21 +660,20 @@ namespace JappeStudios::JappeOS::DaemonCore::DBus
         if (!_active) return;
 
         const auto it = _conn._signalHandlers.find(_key);
-        if (it == _conn._signalHandlers.end())
-            return;
-
-        auto& list = it->second;
-
-        // Invalidate snapshots held by an in-progress dispatch as well.
-        *list[_index] = nullptr;
-        list[_index].reset();
-
-        if (std::all_of(list.begin(), list.end(),
-                        [](auto& f){ return !f; }))
+        if (it != _conn._signalHandlers.end())
         {
-            RemoveMatchRule();
-            _conn._signalHandlers.erase(it);
+            auto& list = it->second;
+
+            // Invalidate snapshots held by an in-progress dispatch as well.
+            *list[_index] = nullptr;
+            list[_index].reset();
+
+            if (std::all_of(list.begin(), list.end(), [](const auto& f) { return !f; }))
+                _conn._signalHandlers.erase(it);
         }
+
+        // Cleanup must also be safe after the bus has disconnected.
+        try { RemoveMatchRule(); } catch (const DBusException&) {}
     }
 
     SignalSubscription::SignalSubscription(SignalSubscription&& other) noexcept
@@ -617,7 +681,8 @@ namespace JappeStudios::JappeOS::DaemonCore::DBus
           _key(std::move(other._key)),
           _index(other._index),
           _match(std::move(other._match)),
-          _active(other._active)
+          _active(other._active),
+          _ownerSubscription(std::move(other._ownerSubscription))
     {
         other._active = false;
     }
@@ -630,6 +695,27 @@ namespace JappeStudios::JappeOS::DaemonCore::DBus
     void SignalSubscription::RemoveMatchRule() const
     {
         _conn.RemoveMatch(_match);
+    }
+
+    SignalSubscription Proxy::SubscribeOwnerChanged(
+        std::function<void(const std::string&, const std::string&)> handler) const
+    {
+        if (_busName.empty() || !dbus_bus_get_unique_name(_conn.GetRawConnection()))
+            throw DBusException(DBUS_ERROR_INVALID_ARGS, "Owner changes require a bus destination");
+
+        return _conn.SubscribeSignal(
+            DBUS_SERVICE_DBUS,
+            ObjectPath(DBUS_PATH_DBUS),
+            InterfaceName(DBUS_INTERFACE_DBUS),
+            "NameOwnerChanged",
+            [busName = _busName, handler = std::move(handler)](const Message& msg)
+            {
+                const auto [name, oldOwner, newOwner] =
+                    msg.GetArgs<std::string, std::string, std::string>();
+                if (name == busName)
+                    handler(oldOwner, newOwner);
+            }
+        );
     }
 
     // Message

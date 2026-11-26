@@ -139,6 +139,31 @@ This basically means that the name acquisition happens after your daemon class h
 > [!IMPORTANT]
 > While you can do somewhat computationally heavy work in the constructor, do note that doing long-lasting or computationally-heavy work on the main thread is not recommended. Your constructor, destructor and DBus methods get called on the main thread. If you need to do heavy work, consider using a separate background thread, and joining it in the destructor safely. By offloading/deferring heavy work to a background thread, you avoid making the daemon unresponsive.
 
+### Following D-Bus service restarts
+
+Construct `DBus::Proxy` with a well-known service name to keep using it across
+service restarts. Existing signal subscriptions follow the new owner. A unique
+name such as `:1.42` instead stays bound to that particular connection.
+
+Use `SubscribeOwnerChanged` when you also need to clear cached state or rediscover
+objects whose paths may change after a restart:
+
+```c++
+auto ownerSubscription = proxy.SubscribeOwnerChanged(
+    [](const std::string& oldOwner, const std::string& newOwner)
+    {
+        // An empty newOwner means the service disappeared.
+        // A nonempty newOwner means it appeared or was replaced: refresh state.
+    });
+```
+
+Keep subscriptions alive for as long as notifications are needed. Owner-change
+callbacks report future transitions, without an initial notification. The usual
+connection message dispatch must keep running. Calls made during downtime can
+throw `DBusException`; the wrapper does not automatically retry calls or reconnect
+a disconnected bus/private peer. Property subscriptions report changes emitted
+by the service, rather than automatically fetching values after a restart.
+
 ### Creating a systemd daemon
 
 To create a systemd daemon, you don't actually need to rewrite everything, instead, you create a systemd `jappeos-myserviced.service` file for it:

@@ -1527,6 +1527,7 @@ namespace JappeStudios::JappeOS::DaemonCore::DBus
         size_t _index;
         std::string _match;
         bool _active{true};
+        std::unique_ptr<SignalSubscription> _ownerSubscription;
 
         void AddMatchRule() const;
         void RemoveMatchRule() const;
@@ -2326,6 +2327,12 @@ namespace JappeStudios::JappeOS::DaemonCore::DBus
      *
      * Provides high-level methods for calling methods and accessing properties
      * on remote D-Bus objects without dealing with message construction directly.
+     * Well-known bus names follow service restarts; unique names stay bound to
+     * one connection. Calls during downtime can fail and are never retried.
+     * Remote object paths and application caches may need rebuilding on restart.
+     * This does not reconnect a disconnected bus or private peer connection.
+     * The Connection must outlive the proxy and all returned subscriptions;
+     * dispatch and subscription changes must run on the same thread.
      */
     class Proxy
     {
@@ -2519,6 +2526,18 @@ namespace JappeStudios::JappeOS::DaemonCore::DBus
                 newHandler
             );
         }
+
+        /**
+         * @brief Observes service arrival, departure, and owner replacement.
+         *
+         * The callback receives old and new unique names (empty means absent).
+         * No initial notification is emitted. Keep the returned subscription
+         * alive and dispatch Connection messages to receive changes. On arrival,
+         * callers can re-read properties or rediscover service-owned objects.
+         * Only available for bus destinations, not private peers.
+         */
+        [[nodiscard]] SignalSubscription SubscribeOwnerChanged(
+            std::function<void(const std::string&, const std::string&)> handler) const;
 
         [[nodiscard]] const std::string& GetBusName() const { return _busName; }
         [[nodiscard]] const ObjectPath& GetPath() const { return _path; }
